@@ -44,3 +44,19 @@ class AnswerResponse(BaseModel):
     verdict: str | None = None
     rationale: str | None = None
     recommendation: str | None = None
+
+
+class QAPairRead(BaseModel):
+    order: int
+    question: str
+    answer: str | None
+
+
+class SessionRead(BaseModel):
+    id: int
+    status: str
+    role_title: str
+    qa_pairs: list[QAPairRead]
+    verdict: str | None = None
+    rationale: str | None = None
+    recommendation: str | None = None

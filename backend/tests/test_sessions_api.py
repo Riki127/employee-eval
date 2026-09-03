@@ -87,3 +87,33 @@ def test_provider_failure_returns_502_and_leaves_session_in_progress(db_session:
     persisted = db_session.get(AssessmentSession, session_id)
     assert persisted is not None
     assert persisted.status == SessionStatus.in_progress
+
+
+def test_get_session_reflects_in_progress_state(db_session: Session):
+    client = make_client(db_session)
+    start = client.post("/sessions", json={"role_title": "Software Engineer"})
+    session_id = start.json()["session_id"]
+
+    response = client.get(f"/sessions/{session_id}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "in_progress"
+    assert body["role_title"] == "Software Engineer"
+    assert len(body["qa_pairs"]) == 1
+    assert body["verdict"] is None
+
+
+def test_get_session_reflects_completed_state(db_session: Session):
+    client = make_client(db_session)
+    start = client.post("/sessions", json={"role_title": "Software Engineer"})
+    session_id = start.json()["session_id"]
+    for _ in range(5):
+        client.post(f"/sessions/{session_id}/answer", json={"answer": "a reasonably detailed answer"})
+
+    response = client.get(f"/sessions/{session_id}")
+
+    body = response.json()
+    assert body["status"] == "completed"
+    assert len(body["qa_pairs"]) == 5
+    assert body["verdict"] in {"below", "meeting", "exceeding"}

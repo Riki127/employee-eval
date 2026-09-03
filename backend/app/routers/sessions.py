@@ -8,7 +8,7 @@ from app.db import get_session
 from app.employees import get_or_seed_employee
 from app.models import Evaluation, QAPair, Role, AssessmentSession, SessionStatus
 from app.config import settings
-from app.schemas import AnswerRequest, AnswerResponse, SessionStartResponse, StartSessionRequest
+from app.schemas import AnswerRequest, AnswerResponse, QAPairRead, SessionRead, SessionStartResponse, StartSessionRequest
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 ai_provider = MockAIProvider()
@@ -101,3 +101,28 @@ def submit_answer(session_id: int, body: AnswerRequest, db: Session = Depends(ge
     db.commit()
 
     return AnswerResponse(status="in_progress", question=next_question.question)
+
+
+@router.get("/{session_id}", response_model=SessionRead)
+def get_session_detail(session_id: int, db: Session = Depends(get_session)) -> SessionRead:
+    session = db.get(AssessmentSession, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    role = db.get(Role, session.role_id)
+    assert role is not None
+
+    qa_pairs = list(
+        db.exec(select(QAPair).where(QAPair.session_id == session_id).order_by(QAPair.order)).all()
+    )
+    evaluation = db.exec(select(Evaluation).where(Evaluation.session_id == session_id)).first()
+
+    return SessionRead(
+        id=session.id,
+        status=session.status.value,
+        role_title=role.title,
+        qa_pairs=[QAPairRead(order=qa.order, question=qa.question, answer=qa.answer) for qa in qa_pairs],
+        verdict=evaluation.verdict.value if evaluation else None,
+        rationale=evaluation.rationale if evaluation else None,
+        recommendation=evaluation.recommendation if evaluation else None,
+    )
