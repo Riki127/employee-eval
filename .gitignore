@@ -1,0 +1,9 @@
+# Python
+backend/.venv/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
