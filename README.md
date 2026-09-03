@@ -4,6 +4,8 @@ A vertical-slice proof of concept for an AI-assisted employee assessment flow: p
 role, answer five generated questions, get a verdict with a rationale and a
 recommendation.
 
+Main reason for this project is to learn Agentic AI Engineering
+
 - **Backend:** FastAPI + SQLModel + Postgres (`backend/`)
 - **Frontend:** React + TypeScript + Vite + Tailwind (`frontend/`)
 - **AI provider:** a deterministic mock (`backend/app/ai/mock.py`), injected via a
