@@ -3,7 +3,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
-from app.ai.mock import MockAIProvider
+from app.ai import AIProvider, get_ai_provider
 from app.db import get_session
 from app.employees import get_or_seed_employee
 from app.models import Evaluation, QAPair, Role, AssessmentSession, SessionStatus
@@ -11,15 +11,18 @@ from app.config import settings
 from app.schemas import AnswerRequest, AnswerResponse, QAPairRead, SessionRead, SessionStartResponse, StartSessionRequest
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
-ai_provider = MockAIProvider()
 
 
 @router.post("", response_model=SessionStartResponse)
-def start_session(body: StartSessionRequest, db: Session = Depends(get_session)) -> SessionStartResponse:
+def start_session(
+    body: StartSessionRequest,
+    db: Session = Depends(get_session),
+    provider: AIProvider = Depends(get_ai_provider),
+) -> SessionStartResponse:
     employee = get_or_seed_employee(db)
     existing_roles = list(db.exec(select(Role)).all())
     try:
-        match = ai_provider.match_or_create_role(body.role_title, existing_roles)
+        match = provider.match_or_create_role(body.role_title, existing_roles)
     except Exception as exc:
         raise HTTPException(status_code=502, detail="AI provider failed to resolve role") from exc
 
@@ -38,7 +41,7 @@ def start_session(body: StartSessionRequest, db: Session = Depends(get_session))
     db.refresh(session)
 
     try:
-        question = ai_provider.generate_next_question(role, [])
+        question = provider.generate_next_question(role, [])
     except Exception as exc:
         raise HTTPException(status_code=502, detail="AI provider failed to generate a question") from exc
     qa = QAPair(session_id=session.id, order=0, question=question.question)
@@ -49,7 +52,12 @@ def start_session(body: StartSessionRequest, db: Session = Depends(get_session))
 
 
 @router.post("/{session_id}/answer", response_model=AnswerResponse)
-def submit_answer(session_id: int, body: AnswerRequest, db: Session = Depends(get_session)) -> AnswerResponse:
+def submit_answer(
+    session_id: int,
+    body: AnswerRequest,
+    db: Session = Depends(get_session),
+    provider: AIProvider = Depends(get_ai_provider),
+) -> AnswerResponse:
     session = db.get(AssessmentSession, session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -69,7 +77,7 @@ def submit_answer(session_id: int, body: AnswerRequest, db: Session = Depends(ge
 
     if len(qa_pairs) >= settings.session_question_count:
         try:
-            evaluation_result = ai_provider.evaluate_session(role, qa_pairs)
+            evaluation_result = provider.evaluate_session(role, qa_pairs)
         except Exception as exc:
             raise HTTPException(status_code=502, detail="AI provider failed to evaluate the session") from exc
 
@@ -93,7 +101,7 @@ def submit_answer(session_id: int, body: AnswerRequest, db: Session = Depends(ge
         )
 
     try:
-        next_question = ai_provider.generate_next_question(role, qa_pairs)
+        next_question = provider.generate_next_question(role, qa_pairs)
     except Exception as exc:
         raise HTTPException(status_code=502, detail="AI provider failed to generate a question") from exc
     next_qa = QAPair(session_id=session.id, order=len(qa_pairs), question=next_question.question)

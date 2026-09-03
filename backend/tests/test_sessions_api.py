@@ -1,9 +1,16 @@
 from fastapi.testclient import TestClient
 from sqlmodel import Session
 
+from app.ai import get_ai_provider
+from app.ai.mock import MockAIProvider
 from app.db import get_session
 from app.main import app
-from app.models import AssessmentSession, SessionStatus
+from app.models import AssessmentSession, QAPair, Role, SessionStatus
+
+
+class _FailingProvider(MockAIProvider):
+    def generate_next_question(self, role: Role, qa_history: list[QAPair]) -> None:
+        raise RuntimeError("mock provider exploded")
 
 
 def make_client(db_session: Session) -> TestClient:
@@ -67,23 +74,19 @@ def test_answering_completed_session_returns_409(db_session: Session):
     assert response.status_code == 409
 
 
-def test_provider_failure_returns_502_and_leaves_session_in_progress(db_session: Session, monkeypatch):
-    from app.routers import sessions as sessions_module
-
+def test_provider_failure_returns_502_and_leaves_session_in_progress(db_session: Session):
     client = make_client(db_session)
     start = client.post("/sessions", json={"role_title": "Software Engineer"})
     session_id = start.json()["session_id"]
 
-    def raise_error(*args, **kwargs):
-        raise RuntimeError("mock provider exploded")
+    app.dependency_overrides[get_ai_provider] = lambda: _FailingProvider()
+    try:
+        response = client.post(f"/sessions/{session_id}/answer", json={"answer": "a reasonably detailed answer"})
+    finally:
+        del app.dependency_overrides[get_ai_provider]
 
-    monkeypatch.setattr(sessions_module.ai_provider, "generate_next_question", raise_error)
-
-    response = client.post(f"/sessions/{session_id}/answer", json={"answer": "a reasonably detailed answer"})
     assert response.status_code == 502
 
-    monkeypatch.undo()
-    # GET /sessions/{id} doesn't exist until Task 7 — verify persisted state directly instead.
     persisted = db_session.get(AssessmentSession, session_id)
     assert persisted is not None
     assert persisted.status == SessionStatus.in_progress
