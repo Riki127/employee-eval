@@ -51,7 +51,15 @@ export default function App() {
     return <StartScreen onStart={handleStart} isLoading={isLoading} error={error} />;
   }
   if (screen.kind === "question") {
-    return <QuestionScreen question={screen.question} onSubmit={handleAnswer} isLoading={isLoading} error={error} />;
+    return (
+      <QuestionScreen
+        key={screen.question}
+        question={screen.question}
+        onSubmit={handleAnswer}
+        isLoading={isLoading}
+        error={error}
+      />
+    );
   }
   return <ResultsScreen verdict={screen.verdict} rationale={screen.rationale} recommendation={screen.recommendation} />;
 }

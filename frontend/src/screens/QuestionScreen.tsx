@@ -27,11 +27,7 @@ export function QuestionScreen({ question, onSubmit, isLoading, error }: Questio
         data-testid="submit-answer-button"
         className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
         disabled={isLoading || answer.trim().length === 0}
-        onClick={() => {
-          const submitted = answer.trim();
-          setAnswer("");
-          onSubmit(submitted);
-        }}
+        onClick={() => onSubmit(answer.trim())}
       >
         {isLoading ? "Submitting..." : "Submit Answer"}
       </button>
