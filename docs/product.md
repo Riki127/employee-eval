@@ -19,8 +19,25 @@ assessment process that produces a defensible, repeatable evaluation.
 
 ## Core functionality
 
-- Define roles and role tiers with the expectations an employee at each tier
-  should meet.
+- Role tiers and their expectations are not hardcoded. On first use of a
+  role, an AI agent infers that role's career ladder (e.g. junior → senior
+  developer, manager → senior manager) and the skill expectations for the
+  employee's current tier and the next tier, using its general knowledge —
+  since progression paths differ too much by job family to maintain by
+  hand.
+  - The inferred rubric is persisted per role and reused for later sessions
+    of that role, so results stay consistent and auditable instead of being
+    regenerated (and potentially drifting) every session. An admin can
+    force a regeneration if a rubric needs updating.
+  - Before generating a new rubric, the agent checks whether an existing
+    role is effectively the same job (e.g. "Solution Developer" vs.
+    "Software Engineer") and reuses that rubric instead of treating similar
+    titles as distinct roles. Roles are matched by responsibilities/skills,
+    not by title string matching.
+  - Matching is LLM-judged: the agent compares the new role against
+    existing roles and decides if one is an equivalent match. If the LLM
+    isn't confident (ambiguous/borderline match), it falls back to asking
+    the admin to confirm or reject the match instead of guessing.
 - Start an assessment session for an employee against their current role.
 - AI agent dynamically generates role-relevant questions for the session,
   adapting based on prior answers within that session.
@@ -49,8 +66,10 @@ assessment process that produces a defensible, repeatable evaluation.
 2. **Review results** — Manager/admin opens a completed session → sees the
    verdict (below/meeting/exceeding), rationale, learning recommendation,
    and the underlying QA transcript.
-3. **Configure roles** — Admin defines/edits a role and its tier
-   expectations that the question-generation and evaluation agents use.
+3. **Configure roles** — Admin enters a role title (e.g. from a new
+   employee's job title) → agent checks for an existing, effectively-equal
+   role and reuses its rubric, or infers a new career ladder and tier
+   rubric for it → admin can review and force regeneration if needed.
 
 ## Out of scope
 
