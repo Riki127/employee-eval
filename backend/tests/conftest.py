@@ -3,7 +3,7 @@ from sqlmodel import Session, SQLModel, create_engine
 
 from app.config import settings
 
-engine = create_engine(settings.database_url)
+engine = create_engine(settings.database_url, connect_args={"prepare_threshold": None})
 
 
 @pytest.fixture()

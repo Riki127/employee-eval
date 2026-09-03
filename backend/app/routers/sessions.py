@@ -1,11 +1,14 @@
-from fastapi import APIRouter, Depends
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlmodel import Session, select
 
 from app.ai.mock import MockAIProvider
 from app.db import get_session
 from app.employees import get_or_seed_employee
-from app.models import QAPair, Role, AssessmentSession
-from app.schemas import SessionStartResponse, StartSessionRequest
+from app.models import Evaluation, QAPair, Role, AssessmentSession, SessionStatus
+from app.config import settings
+from app.schemas import AnswerRequest, AnswerResponse, SessionStartResponse, StartSessionRequest
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 ai_provider = MockAIProvider()
@@ -15,7 +18,10 @@ ai_provider = MockAIProvider()
 def start_session(body: StartSessionRequest, db: Session = Depends(get_session)) -> SessionStartResponse:
     employee = get_or_seed_employee(db)
     existing_roles = list(db.exec(select(Role)).all())
-    match = ai_provider.match_or_create_role(body.role_title, existing_roles)
+    try:
+        match = ai_provider.match_or_create_role(body.role_title, existing_roles)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="AI provider failed to resolve role") from exc
 
     if match.matched_role_id is not None:
         role = db.get(Role, match.matched_role_id)
@@ -31,9 +37,67 @@ def start_session(body: StartSessionRequest, db: Session = Depends(get_session))
     db.commit()
     db.refresh(session)
 
-    question = ai_provider.generate_next_question(role, [])
+    try:
+        question = ai_provider.generate_next_question(role, [])
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="AI provider failed to generate a question") from exc
     qa = QAPair(session_id=session.id, order=0, question=question.question)
     db.add(qa)
     db.commit()
 
     return SessionStartResponse(session_id=session.id, role_id=role.id, question=question.question)
+
+
+@router.post("/{session_id}/answer", response_model=AnswerResponse)
+def submit_answer(session_id: int, body: AnswerRequest, db: Session = Depends(get_session)) -> AnswerResponse:
+    session = db.get(AssessmentSession, session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    if session.status == SessionStatus.completed:
+        raise HTTPException(status_code=409, detail="Session already completed")
+
+    qa_pairs = list(
+        db.exec(select(QAPair).where(QAPair.session_id == session_id).order_by(QAPair.order)).all()
+    )
+    current_qa = qa_pairs[-1]
+    current_qa.answer = body.answer
+    db.add(current_qa)
+    db.commit()
+
+    role = db.get(Role, session.role_id)
+    assert role is not None
+
+    if len(qa_pairs) >= settings.session_question_count:
+        try:
+            evaluation_result = ai_provider.evaluate_session(role, qa_pairs)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail="AI provider failed to evaluate the session") from exc
+
+        evaluation = Evaluation(
+            session_id=session.id,
+            verdict=evaluation_result.verdict,
+            rationale=evaluation_result.rationale,
+            recommendation=evaluation_result.recommendation,
+        )
+        db.add(evaluation)
+        session.status = SessionStatus.completed
+        session.completed_at = datetime.utcnow()
+        db.add(session)
+        db.commit()
+
+        return AnswerResponse(
+            status="completed",
+            verdict=evaluation_result.verdict.value,
+            rationale=evaluation_result.rationale,
+            recommendation=evaluation_result.recommendation,
+        )
+
+    try:
+        next_question = ai_provider.generate_next_question(role, qa_pairs)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail="AI provider failed to generate a question") from exc
+    next_qa = QAPair(session_id=session.id, order=len(qa_pairs), question=next_question.question)
+    db.add(next_qa)
+    db.commit()
+
+    return AnswerResponse(status="in_progress", question=next_question.question)

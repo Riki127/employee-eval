@@ -32,3 +32,15 @@ class SessionStartResponse(BaseModel):
     session_id: int
     role_id: int
     question: str
+
+
+class AnswerRequest(BaseModel):
+    answer: str
+
+
+class AnswerResponse(BaseModel):
+    status: str
+    question: str | None = None
+    verdict: str | None = None
+    rationale: str | None = None
+    recommendation: str | None = None
