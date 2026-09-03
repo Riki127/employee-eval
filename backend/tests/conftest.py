@@ -4,6 +4,7 @@ from psycopg import errors as psycopg_errors
 from sqlmodel import Session, SQLModel, create_engine
 
 from app.config import settings
+from app.main import app
 
 TEST_DB_NAME = "employee_eval_test"
 _admin_url = settings.database_url.replace("postgresql+psycopg://", "postgresql://")
@@ -22,6 +23,12 @@ def _ensure_test_database_exists() -> None:
 
 _ensure_test_database_exists()
 engine = create_engine(_test_url, connect_args={"prepare_threshold": None})
+
+
+@pytest.fixture(autouse=True)
+def _clear_dependency_overrides():
+    yield
+    app.dependency_overrides.clear()
 
 
 @pytest.fixture()
