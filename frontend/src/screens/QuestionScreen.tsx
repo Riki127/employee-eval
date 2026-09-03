@@ -17,9 +17,10 @@ export function QuestionScreen({ question, onSubmit, isLoading, error }: Questio
       </p>
       <textarea
         data-testid="answer-input"
-        className="w-full border rounded px-3 py-2 mb-4"
+        className="w-full border rounded px-3 py-2 mb-4 disabled:opacity-50"
         rows={4}
         value={answer}
+        disabled={isLoading}
         onChange={(e) => setAnswer(e.target.value)}
       />
       {error && <p className="text-red-600 mb-4">{error}</p>}
