@@ -22,3 +22,13 @@ class EvaluationOutput(BaseModel):
     verdict: Verdict
     rationale: str
     recommendation: str
+
+
+class StartSessionRequest(BaseModel):
+    role_title: str
+
+
+class SessionStartResponse(BaseModel):
+    session_id: int
+    role_id: int
+    question: str
