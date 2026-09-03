@@ -28,7 +28,8 @@ def start_session(
 
     if match.matched_role_id is not None:
         role = db.get(Role, match.matched_role_id)
-        assert role is not None
+        if role is None:
+            raise HTTPException(status_code=502, detail="AI provider returned an unknown role")
     else:
         role = Role(title=body.role_title, rubric=match.rubric.model_dump())
         db.add(role)
@@ -67,13 +68,16 @@ def submit_answer(
     qa_pairs = list(
         db.exec(select(QAPair).where(QAPair.session_id == session_id).order_by(QAPair.order)).all()
     )
+    if not qa_pairs:
+        raise HTTPException(status_code=500, detail="Session has no questions yet")
     current_qa = qa_pairs[-1]
     current_qa.answer = body.answer
     db.add(current_qa)
     db.commit()
 
     role = db.get(Role, session.role_id)
-    assert role is not None
+    if role is None:
+        raise HTTPException(status_code=500, detail="Role not found for session")
 
     if len(qa_pairs) >= settings.session_question_count:
         try:
@@ -118,7 +122,8 @@ def get_session_detail(session_id: int, db: Session = Depends(get_session)) -> S
         raise HTTPException(status_code=404, detail="Session not found")
 
     role = db.get(Role, session.role_id)
-    assert role is not None
+    if role is None:
+        raise HTTPException(status_code=500, detail="Role not found for session")
 
     qa_pairs = list(
         db.exec(select(QAPair).where(QAPair.session_id == session_id).order_by(QAPair.order)).all()
