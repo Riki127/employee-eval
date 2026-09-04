@@ -2,6 +2,7 @@ from pydantic import BaseModel
 
 import anthropic
 
+from app.config import settings
 from app.models import QAPair, Role
 from app.schemas import EvaluationOutput, QuestionOutput, RoleMatchResult, RoleRubric
 
@@ -14,7 +15,17 @@ class _RoleMatchDecision(BaseModel):
 
 class AnthropicAIProvider:
     def __init__(self, client: anthropic.Anthropic | None = None) -> None:
-        self._client = client or anthropic.Anthropic()
+        if client is not None:
+            self._client = client
+        elif settings.anthropic_api_key:
+            # Explicit key from Settings (e.g. loaded from backend/.env), since the SDK's
+            # own automatic os.environ lookup can't see values pydantic-settings read
+            # from a .env file rather than the real process environment.
+            self._client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+        else:
+            # Falls back to the SDK's own credential resolution (ANTHROPIC_API_KEY set
+            # directly in the process environment, `ant auth login`, etc.).
+            self._client = anthropic.Anthropic()
 
     def match_or_create_role(self, title: str, existing_roles: list[Role]) -> RoleMatchResult:
         if existing_roles:

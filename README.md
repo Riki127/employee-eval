@@ -6,9 +6,10 @@ recommendation.
 
 - **Backend:** FastAPI + SQLModel + Postgres (`backend/`)
 - **Frontend:** React + TypeScript + Vite + Tailwind (`frontend/`)
-- **AI provider:** a deterministic mock (`backend/app/ai/mock.py`), injected via a
-  FastAPI dependency (`app.ai.get_ai_provider`) so a real provider can be swapped in
-  without touching the routes.
+- **AI provider:** a deterministic mock by default (`backend/app/ai/mock.py`), or the
+  real Claude API (`backend/app/ai/anthropic_provider.py`) — both implement the same
+  interface, injected via a FastAPI dependency (`app.ai.get_ai_provider`), and are
+  switched with the `AI_PROVIDER` setting (see step 2).
 
 ## Prerequisites
 
@@ -43,6 +44,26 @@ Tables are created automatically on startup.
 
 The database URL can be overridden with the `DATABASE_URL` environment variable; it
 defaults to `postgresql+psycopg://postgres:postgres@localhost:5432/employee_eval`.
+
+### Using the real Claude API instead of the mock
+
+By default the app uses a free, deterministic mock AI provider - no API key needed.
+To use real Claude-generated questions and evaluations instead:
+
+```bash
+cp .env.example .env
+```
+
+Then edit `backend/.env`:
+
+```
+ANTHROPIC_API_KEY=sk-ant-...   # from https://console.anthropic.com
+AI_PROVIDER=anthropic
+```
+
+`backend/.env` is gitignored and read automatically on startup - restart `uvicorn`
+after editing it. Real API calls cost money per request; leave `AI_PROVIDER=mock` (or
+omit the file entirely) to keep using the free mock.
 
 ## 3. Frontend
 
