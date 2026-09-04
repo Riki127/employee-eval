@@ -41,6 +41,15 @@ assessment process that produces a defensible, repeatable evaluation.
 - Start an assessment session for an employee against their current role.
 - AI agent dynamically generates role-relevant questions for the session,
   adapting based on prior answers within that session.
+  - Session length is not fixed. After each answer, the agent decides
+    whether it has enough information to reach a confident verdict, or
+    whether it needs to probe further — with another question or a more
+    hands-on/practical exercise — before it can. The session ends as soon
+    as the agent is confident, not on a preset question count.
+  - Regardless of how confident the agent is, a session is capped at 50
+    questions/exercises. Most people lose focus well before that point, so
+    a session that hasn't converged by 50 should end and be evaluated on
+    what it has rather than keep probing indefinitely.
 - Session context (all QA pairs) is preserved and sent to the evaluation
   agent so the evaluation reflects the full conversation, not just the last
   answer.
@@ -60,9 +69,10 @@ assessment process that produces a defensible, repeatable evaluation.
 
 1. **Take an assessment** — Employee starts a session for their role → AI
    asks a question → employee answers → AI asks the next role-relevant
-   question using prior context → ... → session ends → evaluation agent
-   scores the full session → result and learning recommendation are stored
-   and shown.
+   question (or hands-on exercise) using prior context → ... → the agent
+   decides it has enough information (or the 50-question/exercise cap is
+   reached) → session ends → evaluation agent scores the full session →
+   result and learning recommendation are stored and shown.
 2. **Review results** — Manager/admin opens a completed session → sees the
    verdict (below/meeting/exceeding), rationale, learning recommendation,
    and the underlying QA transcript.
